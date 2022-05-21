@@ -127,6 +127,16 @@ _ip = [ 40, 8, 48, 16, 56, 24, 64, 32, 39, 7,47, 15, 55, 23, 63, 31,
 		34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25 ]
 # 每次密钥循环左移位数
 LS = [ 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2,2, 1 ]
+# 差分分布表 8*64*16
+Sd = []
+for i in range(8):
+	Sd.append([])
+	for j in range(64):
+		Sd[i].append([])
+		for k in range(16):
+			Sd[i][j].append({})
+			Sd[i][j][k]['array']=[]
+			Sd[i][j][k]['count']=0
 '''
 /**
  * IP初始置换
@@ -140,8 +150,12 @@ def changeIP(source):
 	for i in range(64):
 		dest[i] = source[ip[i] - 1]
 	return dest
- 
- 
+
+'''
+/*
+ *十六进制字符串转二进制列表
+*/
+'''
 def string2Binary(str):
 	le = len(str)
 	dest =[0]*le*4
@@ -155,7 +169,31 @@ def string2Binary(str):
 		   dest[i-l+j]=int(d)
 		   j += 1
 	return dest
- 
+'''
+/*
+ *十进制字符串转二进制列表
+*/
+'''
+def decstring2Binary(str):
+	return string2Binary(dec2hex(str))
+'''
+/*
+ *0-63的数转化为6位array
+*/
+'''
+def decstring26bit(str):
+	temp = decstring2Binary(str)
+	ret = [0] * 6
+	if len(temp) > 6:
+		for i in range(6):
+			ret[i] = temp[i+2]
+	else :
+		ret[0] = 0
+		ret[1] = 0
+		for i in range(4):
+			ret[i+2] = temp[i]
+	return ret
+print(decstring26bit('20'))
 '''
 /**
  * IP-1逆置
@@ -330,6 +368,23 @@ def encryption( D,  K) :
 	str = binary2ASC(intArr2Str(temp))
 	return str
 '''
+/*
+ *单个S_box盒变换
+*/
+'''
+def single_S_box(str,n):
+	# 6bit src
+
+	temp = decstring2Binary(str)
+	src = [0]*6
+	for i in range(6 if len(temp)>6 else len(temp)):
+		src[i]=temp[i]
+	s =[s1,s2,s3,s4,s5,s6,s7,s8]
+	x= src[0] * 2 + src[5]
+	y= src[1] * 8 + src[2] * 4 + src[3] * 2 + src[4]
+	return s[n][x][y]
+	
+'''
 /**
  * 8bit压缩2bit
  * @param source(48bit)
@@ -496,13 +551,34 @@ def decryption( C,  K) :
 	temp = changeInverseIP(temp)
 	str = binary2ASC(intArr2Str(temp))
 	return str
+'''
+/*
+ *构建差分攻击统计表
+*/
+'''
+def create_table():
+	global Sd
+	for n in range(8):
+		for i in range(64):
+			for j in range(i+1,64):
+				temp0=bin2dec(intArr2Str(diffOr(decstring26bit(str(i)),decstring26bit(str(j)))))
+				Sbox_x = single_S_box(str(i),n)
+				Sbox_y = single_S_box(str(j),n)
+				temp1=bin2dec(intArr2Str(diffOr(decstring26bit(str(Sbox_x)),decstring26bit(str(Sbox_y)))))
+				Sd[n][int(temp0)][int(temp1)]['array'].append([i,j])
+				Sd[n][int(temp0)][int(temp1)]['count'] += 1
+
 if __name__=="__main__":
  
-	D='3031323334353637'
-	K='3132333435363738'
-	C=encryption(D,K)
-	print("stop")
-	X=decryption(C,K)
-	print(C)
-	print(X)
-	print(type(C),type(D))
+	# D='3031323334353637'
+	# K='3132333435363738'
+	# C=encryption(D,K)
+	# print("stop")
+	# X=decryption(C,K)
+	# print(C)
+	# print(X)
+	# print(type(C),type(D))
+	create_table()
+	print(Sd)
+
+
