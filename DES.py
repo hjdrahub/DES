@@ -125,6 +125,7 @@ _ip = [ 40, 8, 48, 16, 56, 24, 64, 32, 39, 7,47, 15, 55, 23, 63, 31,
 		38, 6, 46, 14, 54, 22, 62, 30, 37, 5, 45,13, 53, 21, 61, 29,
 		36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11,51, 19, 59, 27,
 		34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25 ]
+
 # 每次密钥循环左移位数
 LS = [ 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2,2, 1 ]
 # 差分分布表 8*64*16
@@ -137,6 +138,33 @@ for i in range(8):
 			Sd[i][j].append({})
 			Sd[i][j][k]['array']=[]
 			Sd[i][j][k]['count']=0
+# 放统计规律的C数组 8*64
+C = []
+for i in range(8):
+	C.append([])
+	for j in range(64):
+		C[i].append(0)
+res = []
+for i in range(8):
+	res.append([])
+	for j in range(8):
+		res[i].append([])
+		for k in range(64):
+			res[i][j].append(0)
+'''
+/**
+ * 数组C初始化
+ */
+'''
+def initC(arr):
+	for i in range(8):
+		for j in range(64):
+			arr[i][j] = 0
+def initres(arr):
+	for i in range(8):
+		for j in range(8):
+			for k in range(64):
+				arr[i][j][k] = 0
 '''
 /**
  * IP初始置换
@@ -242,7 +270,7 @@ def setKey(source):
 				temp1[j] = left[j]
 				temp1[j + 28] = right[j]
 		subKey[i] = keyPC_2(temp1)
-		print(subKey[i])
+		# print(subKey[i])
  
 '''
 /**
@@ -339,26 +367,21 @@ def encryption( D,  K) :
 	temp = [0]*64;
 	data = string2Binary(D)
 	# 第一步初始置
-	print(data)
 	data = changeIP(data)
-	print(data)
 	left =  [([0] * 32) for i in range(17)]
 	right = [([0] * 32) for i in range(17)]
 	for j in range(32):
 		left[0][j] = data[j]
 		right[0][j] = data[j + 32]
-	print(left[0],right[0])
 	setKey(K)# sub key ok
 	for i in range(1,17):
 		# 获取(48bit)的轮子密
 		key = subKey[i - 1]
-		print(key)
 		# L1 = R0
 		left[i] = right[i - 1]
 		# R1 = L0 ^ f(R0,K1)
 		fTemp = f(right[i - 1], key)# 32bit
 		right[i] = diffOr(left[i - 1], fTemp)
-		print(left[i],right[i])
 	#组合的时候，左右调换
 	for i in range(32):
 		temp[i] = right[16][i]
@@ -374,16 +397,18 @@ def encryption( D,  K) :
 '''
 def single_S_box(str,n):
 	# 6bit src
-
 	temp = decstring2Binary(str)
 	src = [0]*6
-	for i in range(6 if len(temp)>6 else len(temp)):
-		src[i]=temp[i]
+	if len(temp) > 6 :
+		for i in range(6):
+			src[i] = temp[i + 2]
+	else :
+		for i in range(len(temp)):
+			src[i+2] = temp[i]
 	s =[s1,s2,s3,s4,s5,s6,s7,s8]
 	x= src[0] * 2 + src[5]
 	y= src[1] * 8 + src[2] * 4 + src[3] * 2 + src[4]
 	return s[n][x][y]
-	
 '''
 /**
  * 8bit压缩2bit
@@ -430,6 +455,21 @@ def dataP( source):
 	for i in range(le):
 		dest[i] = source[temp[i] - 1]
 	return dest
+'''
+/**
+ * 逆置换P-1(32bit)
+ * @param source
+ * @return
+ */
+'''
+def dataPT(source):
+	ret = [0] * 32
+	PT = [ 9, 17, 23, 31, 13, 28, 2, 18, 24, 16, 30, 6, 26, 20, 10, 1, 
+		   8, 14, 25, 3, 4, 29, 11, 19, 32, 12, 22, 7, 5, 27, 15, 21]
+	le = len(source)
+	for i in range(32):
+		ret[i] = source[PT[i]-1]
+	return ret
 '''
 /**
  * 2bit扩展8bit
@@ -525,7 +565,7 @@ def decryption( C,  K) :
 	data = string2Binary(C)
 	# 第一步初始置
 	data = changeIP(data)
-	print(data)
+	# print(data)
 	left =  [([0] * 32) for i in range(17)]
 	right = [([0] * 32) for i in range(17)]
 	for j in range(32):
@@ -560,18 +600,95 @@ def create_table():
 	global Sd
 	for n in range(8):
 		for i in range(64):
-			for j in range(i+1,64):
+			for j in range(64):
 				temp0=bin2dec(intArr2Str(diffOr(decstring26bit(str(i)),decstring26bit(str(j)))))
 				Sbox_x = single_S_box(str(i),n)
 				Sbox_y = single_S_box(str(j),n)
 				temp1=bin2dec(intArr2Str(diffOr(decstring26bit(str(Sbox_x)),decstring26bit(str(Sbox_y)))))
-				Sd[n][int(temp0)][int(temp1)]['array'].append([i,j])
+				Sd[n][int(temp0)][int(temp1)]['array'].append(i)
 				Sd[n][int(temp0)][int(temp1)]['count'] += 1
+
+'''
+/*
+ *构建差分攻击计数函数
+ *核心部分，形成统计规律 输入为6位二进制字符串 也可以astr也可以直接传入6位2进制数组
+ *放入C数组中
+*/
+'''
+def attackCount(instr, outstr, astr,t):
+	global C
+	global Sd
+	global res
+	instr = int(bin2dec(instr))
+	outstr = int(bin2dec(outstr))
+	astr  = bin2dec(astr)
+	for j in range(Sd[t][instr][outstr]['count']):
+		temp1 = diffOr(decstring26bit(str(Sd[t][instr][outstr]['array'][j])),decstring26bit(astr))
+		C[t][int(bin2dec(intArr2Str(temp1)))] += 1
+		# res[t][i][int(bin2dec(intArr2Str(temp1)))] += 1
+
+# diff_attack()
+'''
+/*
+ *构建三轮差分攻击函数
+ *主要函数
+ *已知(L0,R0),(L0p,R0p) 默认输入格式为48位16进制字符串
+ *已知(L3,R1),(L3p,R3p)
+ *已知 INT 48bit OUT 32bit
+*/
+'''
+def three_diff_attact(L0,L0p,L3,R3,L3p,R3p,):
+	global C
+	global res
+	temp0 = expend(string2Binary(L3))
+	temp1 = diffOr(expend(string2Binary(L3)),expend(string2Binary(L3p)))
+	temp2 = dataPT(diffOr(diffOr(string2Binary(R3),string2Binary(R3p)),diffOr(string2Binary(L0),string2Binary(L0p))))
+	E = []
+	IN = []
+	OUT = []
+	for i in range(8):
+		E.append([])
+		IN.append([])
+		OUT.append([])
+		for j in range(6):
+			E[i].append(temp0[i*6+j])
+			IN[i].append(temp1[i*6+j])
+		for j in range(4):
+			OUT[i].append(temp2[i*4+j])
+		attackCount(intArr2Str(IN[i]),intArr2Str(OUT[i]),intArr2Str(E[i]),i)
+'''
+/*
+ *密钥还原函数
+ *得到第三轮子密钥
+*/
+'''
+def resetkey():
+	global C
+	for i in range(8):
+		max = 0
+		index = -1
+		for j in range(64)
+			if C[i][j] > max:
+				max = C[i][j]
+				index = j
+# '''
+# /*
+#  *构建差分攻击函数
+#  *主要函数
+#  *已知(L0,R0),(L0p,R0p) 
+#  *已知(L1,R1),(L1p,R1p)
+#  *已知 INT 48bit OUT 32bit
+# */
+# '''
+# def diff_attact(R0,R0p,IN,OUT):
+# 	IN = string2Binary(IN)
+# 	OUT = string2Binary(OUT)
+# 	ER0 = expend(string2Binary(R0))
 
 if __name__=="__main__":
  
-	# D='3031323334353637'
-	# K='3132333435363738'
+	D='3031323334353637'
+	K='1A624C89520DEC46'
 	# C=encryption(D,K)
 	# print("stop")
 	# X=decryption(C,K)
@@ -579,6 +696,18 @@ if __name__=="__main__":
 	# print(X)
 	# print(type(C),type(D))
 	create_table()
-	print(Sd)
+	three_diff_attact('748502CD','38747564','03C70306','D8A09F10','78560A09','60E6D4CB')
+	three_diff_attact('48691102','375BD31F','45FA285B','E5ADC730','134F7915','AC253457')
+	three_diff_attact('357418DA','12549847','D8A31B2F','28BBC5CF','0F317AC2','B23CB944')
+	# print(C)
+	for i in range()
+	# attackCount('47','9','0')
+	# for i in range(8):
+	# 	print('-------')
+	# 	for j in range(64):
+	# 		if C[i][j] != 0:
+	# 			print(j)
+	# print(C)
+	# diff_attack('47','9','0')
 
 
